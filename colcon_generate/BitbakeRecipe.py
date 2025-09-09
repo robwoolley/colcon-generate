@@ -14,27 +14,40 @@
 
 class BitbakeRecipe:
     recipe_boilerplate = "\
-# Recipe created by colcon-generate\n#\n\
-# Copyright (c) 2025 Open Source Robotics Foundation, Inc.\
+# Recipe created by colcon-generate\n\
+#\n\
+# Copyright (c) 2025 Open Source Robotics Foundation, Inc.\n\
+"
+    recipe_depends = "\
+DEPENDS = \"${ROS_BUILD_DEPENDS} ${ROS_BUILDTOOL_DEPENDS}\"\n\
+# Bitbake doesn\'t support the \"export\" concept, so build them as if we needed\n\
+# them to build this package (even though we actually don\'t) so that they\'re\n\
+# guaranteed to have been staged should this package appear in another\'s\n\
+# DEPENDS.\n\
+DEPENDS += \"${ROS_EXPORT_DEPENDS} ${ROS_BUILDTOOL_EXPORT_DEPENDS}\"\n\
+\n\
+RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
 "
 
-    def __init__(self, pkgname):
-        self.name = pkgname.name
-        self.version = pkgname.version
+
+    def __init__(self, pkg):
+        self.name = pkg.name
+        self.version = pkg.version
 
         self.summary = None
-        self.description = pkgname.description
-        self.homepage = pkgname.homepage
+        self.description = pkg.description
+        self.homepage = pkg.homepage
 
         self.section = None
 
-        self.license = "&&".join(pkgname.upstream_license)
+        # license should be an SPDX identifier
+        self.license = "&&".join(pkg.upstream_license)
         self.lic_files_chksum = None
 
         self.src_uri = None
         self.srcrev = None
 
-        # self.build_type
+        self.build_type = pkg.build_type
 
         pass
 
@@ -42,21 +55,48 @@ class BitbakeRecipe:
         return f"{self.name}_{self.version}.bb"
 
     def get_recipe_text(self):
+
+        # XXX For now, hardcode the ROS distro to Humble
+        ROS_DISTRO = "humble"
+        # XXX Get SRCREV from git repo HEAD
+        # XXX Get branch from git repo
+
         lines = []
         lines.append(self.recipe_boilerplate)
-        lines.append(f'SUMMARY = "{self.summary}"')
+        lines.append(f"inherit ros_distro_{ROS_DISTRO}")
+        lines.append(f"inherit ros_component")
+        lines.append("")
+
+        if self.summary:
+            lines.append(f'SUMMARY = "{self.summary}"')
+        # Use print multiline for DESCRIPTION
         lines.append(f'DESCRIPTION = "{self.description}"')
+        # AUTHOR
+        # ROS_AUTHOR
         lines.append(f'HOMEPAGE = "{self.homepage}"')
-        lines.append("\n")
-        lines.append(f'SECTION = "{self.section}"')
+        if self.section:
+            lines.append(f'SECTION = "{self.section}"')
         lines.append(f'LICENSE = "{self.license}"')
         if self.lic_files_chksum:
             lines.append(f'LIC_FILES_CHKSUM = "{self.lic_files_chksum}"')
-        lines.append("\n")
 
-        if self.src_uri:
-            lines.append(f'SRC_URI = "{self.src_uri}"')
-        if self.srcrev:
-            lines.append(f'SRCREV = "{self.srcrev}"')
+        # ROS_CN
+        # ROS_BPN
+
+        # ROS_BUILD_DEPENDS
+        # ROS_BUILDTOOL_DEPENDS
+        # ROS_EXPORT_DEPENDS
+        # ROS_BUILDTOOL_EXPORT_DEPENDS
+        # ROS_EXEC_DEPENDS
+        # ROS_TEST_DEPENDS
+
+        lines.append(self.recipe_depends)
+
+        lines.append(f'SRC_URI = "{self.src_uri}"')
+        lines.append(f'SRCREV = "{self.srcrev}"')
+        lines.append("")
+        lines.append(f"ROS_BUILD_TYPE = \"{self.build_type}\"")
+        lines.append("")
+        lines.append("inherit ros_${ROS_BUILD_TYPE}")
 
         return "\n".join(lines) + "\n"
