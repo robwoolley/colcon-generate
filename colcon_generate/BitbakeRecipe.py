@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from colcon_generate.SPDXLicense import is_spdx_license, map_license
+
 class BitbakeRecipe:
     recipe_boilerplate = "\
 # Recipe created by colcon-generate\n\
@@ -41,7 +43,18 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         self.section = None
 
         # license should be an SPDX identifier
-        self.license = "&&".join(pkg.upstream_license)
+        self.license = []
+        for license_str in pkg.upstream_license:
+            if (is_spdx_license(license_str)):
+                self.license.append(license_str)
+            else:
+                spdx_license = map_license(license_str)
+                if (len(spdx_license) > 0):
+                    print("mapped {} to {}".format(license_str, spdx_license))
+                    self.license.append(spdx_license)
+                else:
+                    self.license.append(license_str)
+
         self.lic_files_chksum = None
 
         self.src_uri = None
@@ -76,7 +89,8 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         lines.append(f'HOMEPAGE = "{self.homepage}"')
         if self.section:
             lines.append(f'SECTION = "{self.section}"')
-        lines.append(f'LICENSE = "{self.license}"')
+        license_expression = " && ".join(self.license)
+        lines.append(f'LICENSE = "{license_expression}"')
         if self.lic_files_chksum:
             lines.append(f'LIC_FILES_CHKSUM = "{self.lic_files_chksum}"')
 
