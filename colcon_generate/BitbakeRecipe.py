@@ -92,8 +92,12 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
 
         if self.summary:
             lines.append(f'SUMMARY = "{self.summary}"')
-        # Use print multiline for DESCRIPTION
-        lines.append(f'DESCRIPTION = "{self.description}"')
+
+        if '\n' in self.description:
+            lines.append(self.get_multiline_variable('DESCRIPTION', self.description))
+        else:
+            lines.append(f'DESCRIPTION = "{self.description}"')
+
         # AUTHOR
         # ROS_AUTHOR
         lines.append(f'HOMEPAGE = "{self.homepage}"')
