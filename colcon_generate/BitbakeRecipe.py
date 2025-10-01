@@ -67,6 +67,16 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
     def bitbake_recipe_filename(self):
         return f"{self.name}_{self.version}.bb"
 
+    @staticmethod
+    def get_multiline_variable(name, value):
+        indent = ' ' * 4
+        lines = []
+        lines.append(f'{name} = "\\')
+        for line in value.splitlines():
+            lines.append(f'{indent}{line.strip()}\\')
+        lines.append('"')
+        return "\n".join(lines)
+
     def get_recipe_text(self):
 
         # XXX For now, hardcode the ROS distro to Humble
