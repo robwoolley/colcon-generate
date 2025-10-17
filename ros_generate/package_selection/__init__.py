@@ -5,11 +5,12 @@ from colcon_core.package_selection import add_arguments as _add_arguments
 from colcon_core.package_selection import get_package_selection_extensions \
     as _get_package_selection_extensions
 from colcon_core.package_selection import get_packages as _get_packages
-from colcon_ros_buildfarm.package_augmentation \
-    import get_package_augmentation_extensions
-from colcon_ros_buildfarm.package_discovery \
+# from ros_generate.package_augmentation \
+#     import get_package_augmentation_extensions
+from ros_generate.package_discovery \
     import get_package_discovery_extensions
 
+from pprint import pprint
 
 def add_arguments(*args, **kwargs):
     """
@@ -20,10 +21,17 @@ def add_arguments(*args, **kwargs):
 
     :param parser: The argument parser
     """
+    print("ROB A")
     if kwargs.get('discovery_extensions') is None:
+        print("ROB B")
         kwargs['discovery_extensions'] = get_package_discovery_extensions()
     if kwargs.get('selection_extensions') is None:
+        print("ROB C")
         kwargs['selection_extensions'] = get_package_selection_extensions()
+    print("ROB D")
+    print(kwargs['discovery_extensions'])
+    print("ROB E")
+    print(kwargs['selection_extensions'])
 
     _add_arguments(*args, **kwargs)
 
@@ -63,9 +71,9 @@ def get_packages(*args, **kwargs):
     if kwargs.get('discovery_extensions') is None:
         kwargs['discovery_extensions'] = get_package_discovery_extensions()
     kwargs['identification_extensions'] = {}
-    if kwargs.get('augmentation_extensions') is None:
-        kwargs['augmentation_extensions'] = \
-            get_package_augmentation_extensions()
+    # if kwargs.get('augmentation_extensions') is None:
+    #     kwargs['augmentation_extensions'] = \
+    #         get_package_augmentation_extensions()
     if kwargs.get('selection_extensions') is None:
         kwargs['selection_extensions'] = get_package_selection_extensions()
 

@@ -26,7 +26,9 @@ from colcon_core.verb import VerbExtensionPoint
 from pprint import pprint
 from ros_generate.PackageMetadata import PackageMetadata
 from ros_generate.BitbakeRecipe import BitbakeRecipe
+# from ros_generate.package_selection import add_arguments as add_packages_arguments
 
+from colcon_core.package_selection import add_arguments as add_packages_arguments
 
 import os
 
@@ -40,9 +42,26 @@ class BitbakeVerb(VerbExtensionPoint):
         log_level = get_effective_console_level(colcon_logger)
         logging.getLogger('git').setLevel(log_level)
 
+    def add_arguments(self, *, parser):  # noqa: D102
+        parser.add_argument(
+            '--build-base',
+            default='build_ros_generate',
+            help='The base directory for build files '
+                 '(default: build_ros_generate)')
+        
+        # add_executor_arguments(parser)
+        # add_event_handler_arguments(parser)
+        add_packages_arguments(parser)
+
     def main(self, *, context):  # noqa: D102
         pprint(context)
         args = context.args
+
+    # set_default_config_path(path="lol")
+    # parser = argparse.ArgumentParser()
+    # add_packages_arguments(parser)
+    # args = parser.parse_args([])
+    # extensions = get_package_identification_extensions()
 
         descriptors = get_package_descriptors(args)
 

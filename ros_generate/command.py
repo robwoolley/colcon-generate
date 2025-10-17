@@ -10,6 +10,7 @@ from colcon_core.command \
     as COLCON_LOG_LEVEL_ENVIRONMENT_VARIABLE
 from colcon_core.command import main as colcon_main
 from colcon_core.environment_variable import EnvironmentVariable
+
 from pprint import pprint
 from ros_generate.verb.bitbake import BitbakeVerb
 
@@ -26,6 +27,7 @@ HOME_ENVIRONMENT_VARIABLE = EnvironmentVariable(
 
 def main(*args: str, **kwargs: str) -> Any:
     """Execute the main logic of the command."""
+
     colcon_kwargs = {
         'command_name': 'ros-generate',
         'verb_group_name': 'ros_generate.verb',
