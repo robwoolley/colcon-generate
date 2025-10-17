@@ -11,7 +11,6 @@ from colcon_core.command \
 from colcon_core.command import main as colcon_main
 from colcon_core.environment_variable import EnvironmentVariable
 
-from pprint import pprint
 from ros_generate.verb.bitbake import BitbakeVerb
 
 """Environment variable to set the log level"""

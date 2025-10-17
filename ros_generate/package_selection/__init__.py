@@ -21,17 +21,10 @@ def add_arguments(*args, **kwargs):
 
     :param parser: The argument parser
     """
-    print("ROB A")
     if kwargs.get('discovery_extensions') is None:
-        print("ROB B")
         kwargs['discovery_extensions'] = get_package_discovery_extensions()
     if kwargs.get('selection_extensions') is None:
-        print("ROB C")
         kwargs['selection_extensions'] = get_package_selection_extensions()
-    print("ROB D")
-    print(kwargs['discovery_extensions'])
-    print("ROB E")
-    print(kwargs['selection_extensions'])
 
     _add_arguments(*args, **kwargs)
 
