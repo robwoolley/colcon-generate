@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from colcon_generate.SPDXLicense import is_spdx_license, map_license
+from ros_generate.SPDXLicense import is_spdx_license, map_license
 
 class BitbakeRecipe:
     recipe_boilerplate = "\

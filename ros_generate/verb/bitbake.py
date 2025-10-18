@@ -1,4 +1,5 @@
 # Copyright 2016-2018 Dirk Thomas
+# Copyright 2024 Open Source Robotics Foundation, Inc.
 # Copyright 2025 Wind River Systems, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,28 +14,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
+from colcon_core.logging import colcon_logger
+from colcon_core.logging import get_effective_console_level
 from colcon_core.package_selection import get_package_descriptors
 from colcon_core.package_selection import select_package_decorators
+from colcon_core.package_selection import add_arguments as add_packages_arguments
 from colcon_core.plugin_system import satisfies_version
 from colcon_core.topological_order import topological_order_packages
 from colcon_core.verb import VerbExtensionPoint
-from colcon_generate.PackageMetadata import PackageMetadata
-from colcon_generate.BitbakeRecipe import BitbakeRecipe
-from colcon_generate.subverb import add_generate_subverb_arguments
-from colcon_generate.subverb import GenerateSubverbExtensionPoint
+from ros_generate.PackageMetadata import PackageMetadata
+from ros_generate.BitbakeRecipe import BitbakeRecipe
 
 import os
 
-class BitbakeGenerateSubverb(GenerateSubverbExtensionPoint):
+class BitbakeVerb(VerbExtensionPoint):
     """Generate Bitbake recipes for ROS 2 packages"""
     ros_package_manifest = 'package.xml'
 
     def __init__(self):  # noqa: D107
         super().__init__()
         satisfies_version(VerbExtensionPoint.EXTENSION_POINT_VERSION, '^1.0')
+        log_level = get_effective_console_level(colcon_logger)
+        logging.getLogger('git').setLevel(log_level)
 
     def add_arguments(self, *, parser):  # noqa: D102
-        add_generate_subverb_arguments(parser)
+        parser.add_argument(
+            '--build-base',
+            default='build_ros_generate',
+            help='The base directory for build files '
+                 '(default: build_ros_generate)')
+
+        add_packages_arguments(parser)
 
     def main(self, *, context):  # noqa: D102
         args = context.args
