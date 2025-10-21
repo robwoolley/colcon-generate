@@ -24,8 +24,10 @@ from colcon_core.package_selection import add_arguments as add_packages_argument
 from colcon_core.plugin_system import satisfies_version
 from colcon_core.topological_order import topological_order_packages
 from colcon_core.verb import VerbExtensionPoint
+from git import Repo, GitCommandError
 from ros_generate.PackageMetadata import PackageMetadata
 from ros_generate.BitbakeRecipe import BitbakeRecipe
+from urllib.parse import urlparse
 
 import os
 
@@ -44,9 +46,21 @@ class BitbakeVerb(VerbExtensionPoint):
             '--build-base',
             default='build_ros_generate',
             help='The base directory for build files '
-                 '(default: build_ros_generate)')
+                 '(default: build_ros_generate)'
+        )
+
+        parser.add_argument(
+            '--rosdistro',
+            default=os.environ.get('ROSDISTRO'),
+            help='Name of rosdistro'
+        )
 
         add_packages_arguments(parser)
+
+
+    def format_src_uri(self, uri):  # noqa: D102
+        p = urlparse(uri)
+        return f"git://{p.netloc}{p.path};${{ROS_BRANCH}};protocol={p.scheme}"
 
     def main(self, *, context):  # noqa: D102
         args = context.args
@@ -80,6 +94,72 @@ class BitbakeVerb(VerbExtensionPoint):
                     package_manifest = h.read()
                     pkg_metadata = PackageMetadata(package_manifest, None)
                     bitbake_recipe = BitbakeRecipe(pkg_metadata)
+
+                bitbake_recipe.set_rosdistro(args.rosdistro)
+
+                repo = None
+                # Get source URI and revision
+                try:
+                    repo = Repo(pkg.path, search_parent_directories=True)
+                except Exception as e:
+                    repo = None
+                    print(f"\t- Warning: Could not open git repository for package {pkg.name}: {e}")
+
+                src_uri = None
+                branch = None
+                src_rev = None
+                tag_name = None
+                if repo is not None:
+                    try:
+                        # Use origin remote
+                        src_uri = self.format_src_uri(repo.remotes.origin.url)
+                    except Exception as e:
+                        # Fallback to first remote
+                        if repo.remotes:
+                            src_uri = self.format_src_uri(repo.remotes[0].url)
+
+                    try:
+                        branch = repo.active_branch.name
+                    except Exception as e:
+                        branches = []
+                        # Check local branches that contain the current commit
+                        for head in repo.heads:
+                            if repo.is_ancestor(repo.head.commit, head.commit):
+                                branches.append(head.name)
+
+                        # Check remote branches that contain the current commit
+                        for remote in repo.remotes:
+                            for ref in remote.refs:
+                                if repo.is_ancestor(repo.head.commit, ref.commit):
+                                    branches.append(ref.name)
+
+                        # Remove duplicates
+                        unique_branches = list(set(branches))
+
+                        # Select branch based on rosdistro or common defaults
+                        if len(unique_branches) > 0:
+                            if f"origin/{args.rosdistro}" in unique_branches:
+                                branch = args.rosdistro
+                            elif "main" in unique_branches:
+                                branch = "main"
+                            elif "master" in unique_branches:
+                                branch = "master"
+                            else:
+                                branch = unique_branches[0].removeprefix("origin/")
+
+                        # print(f"\t- Found branches for package {pkg.name}: {unique_branches}, selected branch: {branch}")
+
+                    # Get the current commit hash
+                    src_rev = repo.head.commit.hexsha
+
+                    repo_name = repo.working_tree_dir.split("/")[-1]
+
+                    try:
+                        tag_name = repo.git.describe('--tags', '--abbrev=0')
+                    except GitCommandError:
+                        tag_name = None
+
+                    bitbake_recipe.set_git_metadata(src_uri, branch, src_rev, repo_name, tag_name)
 
                 ros_bitbake_recipe = os.path.join(self.build_base, bitbake_recipe.bitbake_recipe_filename())
                 lines.append(f"\t- Bitbake recipe: {ros_bitbake_recipe}")

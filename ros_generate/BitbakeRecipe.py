@@ -14,9 +14,11 @@
 
 from ros_generate.SPDXLicense import is_spdx_license, map_license
 
+ROS_DISTRO_DEFAULT = "rolling"
+
 class BitbakeRecipe:
     recipe_boilerplate = "\
-# Recipe created by colcon-generate\n\
+# Recipe created by ros-generate\n\
 #\n\
 # Copyright (c) 2025 Open Source Robotics Foundation, Inc.\n\
 "
@@ -40,6 +42,22 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         self.description = pkg.description
         self.homepage = pkg.homepage
 
+        if pkg.author_name and pkg.author_email:
+            self.author = f"{pkg.author_name} <{pkg.author_email}>"
+        elif pkg.author_name:
+            self.author = pkg.author_name
+        else:
+            self.author = None
+
+        if pkg.upstream_name and pkg.upstream_email:
+            self.maintainer = f"{pkg.upstream_name} <{pkg.upstream_email}>"
+        elif pkg.upstream_name:
+            self.maintainer = pkg.upstream_email
+        else:
+            self.maintainer = None
+
+        self.rosdistro = ROS_DISTRO_DEFAULT
+
         self.section = None
 
         # license should be an SPDX identifier
@@ -50,7 +68,7 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
             else:
                 spdx_license = map_license(license_str)
                 if (len(spdx_license) > 0):
-                    print("mapped {} to {}".format(license_str, spdx_license))
+                    # print("mapped {} to {}".format(license_str, spdx_license))
                     self.license.append(spdx_license)
                 else:
                     self.license.append(license_str)
@@ -59,6 +77,7 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
 
         self.src_uri = None
         self.srcrev = None
+        self.branch = None
 
         self.build_type = pkg.build_type
 
@@ -77,16 +96,21 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         lines.append('"')
         return "\n".join(lines)
 
+    def set_git_metadata(self, src_uri, branch, srcrev, repo_name, tag_name):
+        self.src_uri = src_uri
+        self.srcrev = srcrev
+        self.branch = branch
+        self.repo_name = repo_name
+        self.tag_name = tag_name
+        # print(f"Set git metadata: SRC_URI={self.src_uri}, BRANCH={self.branch}, SRCREV={self.srcrev}, TAG={self.tag_name}")
+
+    def set_rosdistro(self, rosdistro):
+        self.rosdistro = rosdistro
+
     def get_recipe_text(self):
-
-        # XXX For now, hardcode the ROS distro to Humble
-        ROS_DISTRO = "humble"
-        # XXX Get SRCREV from git repo HEAD
-        # XXX Get branch from git repo
-
         lines = []
         lines.append(self.recipe_boilerplate)
-        lines.append(f"inherit ros_distro_{ROS_DISTRO}")
+        lines.append(f"inherit ros_distro_{self.rosdistro}")
         lines.append(f"inherit ros_component")
         lines.append("")
 
@@ -98,8 +122,10 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         else:
             lines.append(f'DESCRIPTION = "{self.description}"')
 
-        # AUTHOR
-        # ROS_AUTHOR
+        lines.append(f'AUTHOR = "{self.maintainer}"')
+        if self.author:
+            lines.append(f'ROS_AUTHOR = "{self.author}"')
+
         lines.append(f'HOMEPAGE = "{self.homepage}"')
         if self.section:
             lines.append(f'SECTION = "{self.section}"')
@@ -108,8 +134,10 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         if self.lic_files_chksum:
             lines.append(f'LIC_FILES_CHKSUM = "{self.lic_files_chksum}"')
 
-        # ROS_CN
-        # ROS_BPN
+        lines.append("")
+        lines.append(f'ROS_CN = "{self.repo_name}"')
+        lines.append(f'ROS_BPN = "{self.name}"')
+        lines.append("")
 
         # ROS_BUILD_DEPENDS
         # ROS_BUILDTOOL_DEPENDS
@@ -120,6 +148,7 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
 
         lines.append(self.recipe_depends)
 
+        lines.append(f'ROS_BRANCH ?= "branch={self.branch}"')
         lines.append(f'SRC_URI = "{self.src_uri}"')
         lines.append(f'SRCREV = "{self.srcrev}"')
         lines.append("")
