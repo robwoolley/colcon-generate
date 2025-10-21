@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from ros_generate.SPDXLicense import is_spdx_license, map_license
+from ros_generate.rosdep_support import resolve_rosdep_key
 
 ROS_DISTRO_DEFAULT = "rolling"
 
@@ -32,9 +33,44 @@ DEPENDS += \"${ROS_EXPORT_DEPENDS} ${ROS_BUILDTOOL_EXPORT_DEPENDS}\"\n\
 \n\
 RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
 "
+    ROS_PLATFORM_NAME = "openembedded"
 
+    def __init__(self):
+        self.name = None
+        self.version = None
+        self.summary = None
+        self.description = None
+        self.homepage = None
+        self.author = None
+        self.maintainer = None
 
-    def __init__(self, pkg):
+        self.rosdistro = ROS_DISTRO_DEFAULT
+
+        self.internal_packages = []
+
+        self.section = None
+
+        # license should be an SPDX identifier
+        self.license = []
+
+        self.lic_files_chksum = None
+
+        self.src_uri = None
+        self.srcrev = None
+        self.branch = None
+
+        self.build_type = None
+
+    def set_rosdistro(self, rosdistro):
+        self.rosdistro = rosdistro
+
+    # Set a list of internal packages (released in the same distro)
+    def set_internal_packages(self, internal_packages):
+        # print(f"DEBUG: Print internal packages:\n{internal_packages}")
+
+        self.internal_packages = internal_packages
+
+    def importPackage(self, pkg):
         self.name = pkg.name
         self.version = pkg.version
 
@@ -56,10 +92,6 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         else:
             self.maintainer = None
 
-        self.rosdistro = ROS_DISTRO_DEFAULT
-
-        self.section = None
-
         # license should be an SPDX identifier
         self.license = []
         for license_str in pkg.upstream_license:
@@ -73,27 +105,77 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
                 else:
                     self.license.append(license_str)
 
-        self.lic_files_chksum = None
-
-        self.src_uri = None
-        self.srcrev = None
-        self.branch = None
+        self.build_depends = [self.convert_to_oe_naming(obj) for obj in pkg.build_depends]
+        self.build_export_depends = [self.convert_to_oe_naming(obj) for obj in pkg.build_export_depends]
+        self.buildtool_depends = [self.convert_to_oe_naming(obj, True) for obj in pkg.buildtool_depends]
+        self.buildtool_export_depends = [self.convert_to_oe_naming(obj, True) for obj in pkg.buildtool_export_depends]
+        self.exec_depends = [self.convert_to_oe_naming(obj) for obj in pkg.exec_depends]
+        self.run_depends = [self.convert_to_oe_naming(obj) for obj in pkg.run_depends]
+        self.test_depends = [self.convert_to_oe_naming(obj) for obj in pkg.test_depends]
+        self.doc_depends = [self.convert_to_oe_naming(obj) for obj in pkg.doc_depends]
 
         self.build_type = pkg.build_type
 
-        pass
+    def convert_to_oe_naming(self, ros_pkgname, isNative=False):
+        oe_pkgname = ""
+        result = ""
+
+        if str(ros_pkgname) in self.internal_packages:
+           oe_pkgname = str(ros_pkgname)
+           oe_pkgname = oe_pkgname.lower().replace('_', '-')
+        else:
+            # print(f"Resolving external package: {ros_pkgname}, {self.ROS_PLATFORM_NAME}, {self.rosdistro}")
+            try:
+                (resolved_key, _, _) = \
+                    resolve_rosdep_key(str(ros_pkgname), self.ROS_PLATFORM_NAME, '', self.rosdistro)
+
+                result = resolved_key[0]
+            except Exception as e:
+                result = None
+                print(f"\t- Warning: Could not resolve external package {ros_pkgname}: {e}")
+
+                pass
+
+            if result:
+                # Remove any layer information from the first resolved key
+                # print(f"DEBUG: Resolved rosdep key {ros_pkgname} to {result} {type(result)}")
+                oe_pkgname = str(result).split('@')[0]
+
+                # OpenEmbedded entries should already follow OE naming convention
+                # oe_pkgname = oe_pkgname.lower().replace('_', '-')
+            else:
+                # Fallback to ROS package name conversion
+                oe_pkgname = str(ros_pkgname)
+                oe_pkgname = oe_pkgname.lower().replace('_', '-')
+                print(f"\t- Falling back to using OE-naming convention: {oe_pkgname}")
+
+        if isNative:
+            oe_pkgname = oe_pkgname + "-native"
+
+        return oe_pkgname
 
     def bitbake_recipe_filename(self):
-        return f"{self.name}_{self.version}.bb"
+        recipename = self.name.replace('_', '-')
+        return f"{recipename}_{self.version}.bb"
 
     @staticmethod
     def get_multiline_variable(name, value):
         indent = ' ' * 4
         lines = []
-        lines.append(f'{name} = "\\')
-        for line in value.splitlines():
-            lines.append(f'{indent}{line.strip()}\\')
-        lines.append('"')
+        if len(value) == 0:
+            lines.append(f'{name} = ""')
+        else:
+            lines.append(f'{name} = "\\')
+            if isinstance(value, str):
+                    for line in value.splitlines():
+                        lines.append(f'{indent}{line.strip()}\\')
+            elif isinstance(value, list):
+                for item in value:
+                    lines.append(f'{indent}{item}\\')
+            else:
+                raise TypeError("value must be str or list, found {}".format(type(value)))
+            lines.append('"')
+
         return "\n".join(lines)
 
     def set_git_metadata(self, src_uri, branch, srcrev, repo_name, tag_name):
@@ -103,9 +185,6 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         self.repo_name = repo_name
         self.tag_name = tag_name
         # print(f"Set git metadata: SRC_URI={self.src_uri}, BRANCH={self.branch}, SRCREV={self.srcrev}, TAG={self.tag_name}")
-
-    def set_rosdistro(self, rosdistro):
-        self.rosdistro = rosdistro
 
     def get_recipe_text(self):
         lines = []
@@ -139,12 +218,23 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         lines.append(f'ROS_BPN = "{self.name}"')
         lines.append("")
 
-        # ROS_BUILD_DEPENDS
-        # ROS_BUILDTOOL_DEPENDS
-        # ROS_EXPORT_DEPENDS
-        # ROS_BUILDTOOL_EXPORT_DEPENDS
-        # ROS_EXEC_DEPENDS
-        # ROS_TEST_DEPENDS
+        lines.append(self.get_multiline_variable('ROS_BUILD_DEPENDS', self.build_depends))
+        lines.append("")
+        lines.append(self.get_multiline_variable('ROS_BUILDTOOL_DEPENDS', self.buildtool_depends))
+        lines.append("")
+        lines.append(self.get_multiline_variable('ROS_EXPORT_DEPENDS', self.build_export_depends))
+        lines.append("")
+        lines.append(self.get_multiline_variable('ROS_BUILDTOOL_EXPORT_DEPENDS', self.buildtool_export_depends))
+        lines.append("")
+        lines.append(self.get_multiline_variable('ROS_EXEC_DEPENDS', self.exec_depends))
+        lines.append("")
+        lines.append("# Currently informational only -- see http://www.ros.org/reps/rep-0149.html#dependency-tags.")
+        lines.append(self.get_multiline_variable('ROS_TEST_DEPENDS', self.test_depends))
+        lines.append("")
+        # if self.run_depends:
+        #     lines.append(self.get_multiline_variable('ROS_RUN_DEPENDS', self.run_depends))
+        # if self.doc_depends:
+        #     lines.append(self.get_multiline_variable('ROS_DOC_DEPENDS', self.doc_depends))
 
         lines.append(self.recipe_depends)
 

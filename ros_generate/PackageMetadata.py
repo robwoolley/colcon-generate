@@ -59,3 +59,12 @@ class PackageMetadata:
             group.name for group in pkg.member_of_groups
         ]
         self.build_type = pkg.get_build_type()
+
+        self.build_depends = pkg.build_depends
+        self.buildtool_depends = pkg.buildtool_depends
+        self.build_export_depends = pkg.build_export_depends
+        self.buildtool_export_depends = pkg.buildtool_export_depends
+        self.exec_depends = pkg.exec_depends
+        self.run_depends = pkg.run_depends
+        self.test_depends = pkg.test_depends
+        self.doc_depends = pkg.doc_depends

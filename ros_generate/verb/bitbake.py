@@ -25,8 +25,9 @@ from colcon_core.plugin_system import satisfies_version
 from colcon_core.topological_order import topological_order_packages
 from colcon_core.verb import VerbExtensionPoint
 from git import Repo, GitCommandError
-from ros_generate.PackageMetadata import PackageMetadata
+from rosdistro import get_index, get_index_url, get_cached_distribution
 from ros_generate.BitbakeRecipe import BitbakeRecipe
+from ros_generate.PackageMetadata import PackageMetadata
 from urllib.parse import urlparse
 
 import os
@@ -62,8 +63,33 @@ class BitbakeVerb(VerbExtensionPoint):
         p = urlparse(uri)
         return f"git://{p.netloc}{p.path};${{ROS_BRANCH}};protocol={p.scheme}"
 
+    def list_packages(self, distro_name):
+        index_url = get_index_url()
+        index = get_index(index_url)
+        distro = get_cached_distribution(index, distro_name)
+
+        if not distro:
+            raise ValueError(f"Distro '{distro_name}' not found")
+
+        versioned_packages = []
+        unversioned_packages = []
+        for pkg_name, pkg in distro.release_packages.items():
+            repo = distro.repositories[pkg.repository_name]
+            release_repo = repo.release_repository
+
+            if release_repo is None:
+                continue
+            elif release_repo.version:
+                versioned_packages.append(pkg_name)
+            else:
+                unversioned_packages.append(pkg_name)
+
+        return versioned_packages, unversioned_packages
+
     def main(self, *, context):  # noqa: D102
         args = context.args
+
+        (released_packages, _) = self.list_packages(args.rosdistro)
 
         descriptors = get_package_descriptors(args)
 
@@ -93,9 +119,11 @@ class BitbakeVerb(VerbExtensionPoint):
                 with open(package_manifest_path, 'r') as h:
                     package_manifest = h.read()
                     pkg_metadata = PackageMetadata(package_manifest, None)
-                    bitbake_recipe = BitbakeRecipe(pkg_metadata)
 
+                bitbake_recipe = BitbakeRecipe()
                 bitbake_recipe.set_rosdistro(args.rosdistro)
+                bitbake_recipe.set_internal_packages(released_packages)
+                bitbake_recipe.importPackage(pkg_metadata)
 
                 repo = None
                 # Get source URI and revision
@@ -160,6 +188,7 @@ class BitbakeVerb(VerbExtensionPoint):
                         tag_name = None
 
                     bitbake_recipe.set_git_metadata(src_uri, branch, src_rev, repo_name, tag_name)
+
 
                 ros_bitbake_recipe = os.path.join(self.build_base, bitbake_recipe.bitbake_recipe_filename())
                 lines.append(f"\t- Bitbake recipe: {ros_bitbake_recipe}")
