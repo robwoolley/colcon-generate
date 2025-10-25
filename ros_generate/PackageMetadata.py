@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from catkin_pkg.package import parse_package_string
+import hashlib
 
 
 class PackageMetadata:
@@ -31,6 +32,19 @@ class PackageMetadata:
         self.version = pkg.version
         self.description = pkg.description
         self.upstream_license = pkg.licenses
+
+        self.license_line = ''
+        self.license_md5 = ''
+
+        i = 1
+        for line in pkg_xml.splitlines():
+            if 'license' in line:
+                self.license_line = str(i)
+                md5 = hashlib.md5()
+                md5.update((line+"\n").encode('utf-8'))
+                self.license_md5 = md5.hexdigest()
+                break
+            i = i + 1
 
         if 'website' in [url.type for url in pkg.urls]:
             self.homepage = [

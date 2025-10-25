@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os.path
 from ros_generate.SPDXLicense import is_spdx_license, map_license
 from ros_generate.rosdep_support import resolve_rosdep_key
 
@@ -59,6 +60,8 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         self.srcrev = None
         self.branch = None
 
+        self.pkg_path = None
+
         self.build_type = None
 
     def set_rosdistro(self, rosdistro):
@@ -104,6 +107,9 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
                     self.license.append(spdx_license)
                 else:
                     self.license.append(license_str)
+
+        self.license_line = pkg.license_line
+        self.license_md5 = pkg.license_md5
 
         self.build_depends = [self.convert_to_oe_naming(obj) for obj in pkg.build_depends]
         self.build_export_depends = [self.convert_to_oe_naming(obj) for obj in pkg.build_export_depends]
@@ -186,11 +192,14 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         self.tag_name = tag_name
         # print(f"Set git metadata: SRC_URI={self.src_uri}, BRANCH={self.branch}, SRCREV={self.srcrev}, TAG={self.tag_name}")
 
+    def set_pkg_path(self, pkg_path):
+        self.pkg_path = pkg_path
+
     def get_recipe_text(self):
         lines = []
         lines.append(self.recipe_boilerplate)
         lines.append(f"inherit ros_distro_{self.rosdistro}")
-        lines.append(f"inherit ros_component")
+        lines.append(f"inherit ros_generate_generated")
         lines.append("")
 
         if self.summary:
@@ -208,10 +217,10 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         lines.append(f'HOMEPAGE = "{self.homepage}"')
         if self.section:
             lines.append(f'SECTION = "{self.section}"')
-        license_expression = " && ".join(self.license)
+        license_expression = " & ".join(self.license)
         lines.append(f'LICENSE = "{license_expression}"')
-        if self.lic_files_chksum:
-            lines.append(f'LIC_FILES_CHKSUM = "{self.lic_files_chksum}"')
+
+        lines.append(f'LIC_FILES_CHKSUM = "file://package.xml;beginline={self.license_line};endline={self.license_line};md5={self.license_md5}"')
 
         lines.append("")
         lines.append(f'ROS_CN = "{self.repo_name}"')
@@ -241,6 +250,16 @@ RDEPENDS:${PN} += \"${ROS_EXEC_DEPENDS}\"\n\
         lines.append(f'ROS_BRANCH ?= "branch={self.branch}"')
         lines.append(f'SRC_URI = "{self.src_uri}"')
         lines.append(f'SRCREV = "{self.srcrev}"')
+        # XXX: Only use WORKDIR for older Yocto releases like scarthgap
+
+        split_path = self.pkg_path.split(os.path.sep)
+        if len(split_path) > 2:
+            git_subdir = os.path.sep + os.path.join(*split_path[2:])
+        else:
+            git_subdir = ""
+
+        lines.append(f'S = "${{WORKDIR}}/git{git_subdir}"')
+
         lines.append("")
         lines.append(f"ROS_BUILD_TYPE = \"{self.build_type}\"")
         lines.append("")

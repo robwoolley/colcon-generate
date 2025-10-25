@@ -124,6 +124,7 @@ class BitbakeVerb(VerbExtensionPoint):
                 bitbake_recipe.set_rosdistro(args.rosdistro)
                 bitbake_recipe.set_internal_packages(released_packages)
                 bitbake_recipe.importPackage(pkg_metadata)
+                bitbake_recipe.set_pkg_path(str(pkg.path))
 
                 repo = None
                 # Get source URI and revision
