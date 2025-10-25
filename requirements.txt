@@ -1,1 +1,10 @@
-GitPython
+argparse
+catkin_pkg
+colcon_core
+gitpython
+pathlib
+pytest
+rosdep2
+rosdistro
+setuptools
+typing
